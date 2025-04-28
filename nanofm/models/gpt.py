@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import math
 import numpy as np
 import torch
@@ -64,7 +64,7 @@ class GPT(nn.Module):
         self.trunk = TransformerTrunk(dim, depth, head_dim, mlp_ratio, use_bias)
         
         self.out_norm = LayerNorm(dim, bias=use_bias)
-        self.to_logits = nn.Linear(dim, max_seq_len, bias=False)
+        self.to_logits = nn.Linear(dim, vocab_size, bias=False)
 
         self.initialize_weights() # Weight initialization
 
@@ -118,7 +118,7 @@ class GPT(nn.Module):
         
         # TODO: Add the positional embeddings to the tokens
         # Hint: Make sure this works for sequences of different lengths
-        embeddings = embeddings + self.positional_embedding[:, :L, :]
+        embeddings = embeddings + self.positional_embedding[:L, :].unsqueeze(0)
 
         # TODO: Define the causal mask for the transformer trunk. 
         # False = masked-out, True = not masked. Shape: [1, L, L]
@@ -150,10 +150,10 @@ class GPT(nn.Module):
         """
         # TODO: Compute the cross-entropy loss
         # Hint: Remember to ignore the padding token index in the loss calculation
+        B, L, V = logits.size()
         return F.cross_entropy(
-            logits,
-            target_seq,
-            weight=self.weight,
+            logits.reshape(-1, V),  # Combine batch and sequence dimensions
+            target_seq.reshape(-1),  # Flatten the target sequence
             ignore_index=padding_idx
         )
 

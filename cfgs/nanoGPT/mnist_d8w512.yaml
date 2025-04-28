@@ -5,7 +5,7 @@ output_dir: ./outputs/auto # Set to auto to use the run_name
 
 # Global variables used throughout the config
 global_vars:
-  batch_size: 256 # per GPU
+  batch_size: 128 # per GPU
   max_seq_len: 50 # 1 label token + 7*7 patches
 
 # Training
@@ -26,7 +26,7 @@ save_ckpt_freq: 50 # in millions of tokens
 # Logging
 log_wandb: True
 wandb_project: COM304_nanoGPT # wandb project name
-wandb_entity: ugo-balducci # Set to your wandb username
+wandb_entity: VisualIntelligence2025 # Set to your wandb username
 wandb_run_name: auto # Set to auto to use the run_name
 
 # Model config
