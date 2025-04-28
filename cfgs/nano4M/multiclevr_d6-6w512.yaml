@@ -58,7 +58,7 @@ model_config:
 # Train loader config
 train_loader_config:
   _target_: nanofm.data.multimodal.create_multimodal_masked_dataloader
-  root_dir: /work/com-304/datasets/clevr_com_304/
+  root_dir: clevr # REPLACE WITH YOUR DATASET PATH
   split: train
   modalities: ${global_vars.modalities}
   vocab_sizes: ${global_vars.vocab_sizes}
@@ -83,7 +83,7 @@ train_loader_config:
 # Eval loader config
 eval_loader_config:
   _target_: nanofm.data.multimodal.create_multimodal_masked_dataloader
-  root_dir: /work/com-304/datasets/clevr_com_304/
+  root_dir: clevr # REPLACE WITH YOUR DATASET PATH
   split: val
   modalities: ${global_vars.modalities}
   vocab_sizes: ${global_vars.vocab_sizes}
