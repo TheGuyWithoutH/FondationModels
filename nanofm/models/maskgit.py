@@ -334,8 +334,7 @@ class MaskGIT(nn.Module):
                 logits=selected_logits,
                 temperature=temp,
                 top_k=top_k,
-                top_p=top_p,
-                return_probs=True
+                top_p=top_p
             )
             
             # TODO: Update the sequence and mask. 

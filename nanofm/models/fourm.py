@@ -462,64 +462,58 @@ class FourM(nn.Module):
         # Get schedule for unmasking tokens
         schedule = self.get_unmasking_schedule(n_tokens_target, num_steps)
 
-        # TODO: There are n_tokens_target positions to predict, and we will unmask them in `num_steps` steps.
-        # The order in which we unmask the tokens is arbitrary, but here we will use a random order.
-        # That means, we will randomly shuffle the positions from 0 to n_tokens_target - 1, and then
-        # split them into `num_steps` steps. 
-        positions = torch.arange(n_tokens_target, device=device)
-
-        # dec_input_positions_list is a list of position indices of shape (1, k) for each step. 
-        # Together, they should contain all the positions from 0 to n_tokens_target - 1 exactly once.
-        dec_input_positions_list = []
-        for step in range(num_steps):
-            # Randomly shuffle the positions
-            shuffled_positions = positions[torch.randperm(n_tokens_target, device=device)]
-            # Select the first k positions for this step
-            k = schedule[step]
-            dec_input_positions_list.append(shuffled_positions[:k])
-            # Remove the selected positions from the list
-            positions = shuffled_positions[k:]
+        # Create a list of all positions for the target modality
+        all_positions = torch.randperm(n_tokens_target, device=device)
+        
+        # Track which positions have been processed
+        start_idx = 0
+        
+        # Store all generated tokens
+        all_generated_tokens = torch.zeros(n_tokens_target, dtype=torch.long, device=device)
         
         for step, k in enumerate(schedule):
-            # Select the k positions to predict for this step
-            dec_input_positions = dec_input_positions_list[step]
-            # Create a tensor of k IDs specifying the target modality
-            dec_input_modalities = target_mod_index * torch.ones(1, k, device=device, dtype=torch.long)
+            # Get the positions to predict in this step
+            positions_to_predict = all_positions[start_idx:start_idx + k]
+            start_idx += k
+            
+            # Create decoder inputs with the positions to predict
+            dec_input_positions = positions_to_predict
+            dec_input_modalities = target_mod_index * torch.ones(k, device=device, dtype=torch.long)
 
-            # TODO: Forward pass through the model to get the next tokens' logits. 
-            # Select the 0-th element to get shape: [k, vocab_size]
+            # Forward pass through the model
             predicted_logits = self.forward_model(
                 enc_input_tokens=enc_input_tokens,
                 enc_input_modalities=enc_input_modalities,
                 enc_input_positions=enc_input_positions,
-                dec_input_modalities=dec_input_modalities,
+                dec_input_modalities=dec_input_modalities.unsqueeze(0),
                 dec_input_positions=dec_input_positions.unsqueeze(0),
-            )[0]
-            predicted_logits = predicted_logits[0, dec_input_positions]
-            predicted_logits = predicted_logits.view(k, -1)
-
-            # TODO: Sample new tokens for the predicted_logits
-            # Hint: Use the sample_tokens function from utils/sampling.py
-            # Make sure to pass the `temp`, `top_k` and `top_p` arguments
+            )
+            
+            # Get the logits for the positions we want to predict
+            predicted_logits = predicted_logits[0]
+            
+            # Sample new tokens
             samples, _ = sample_tokens(
                 predicted_logits,
-                num_samples=k,
                 temperature=temp,
                 top_k=top_k,
                 top_p=top_p,
             )
-
-            # TODO: Concatenate the new tokens to the encoder input tokens for the next step
-            # Specifically, concatenate the k samples to enc_input_tokens, the k dec_input_positions
-            # to enc_input_positions, and the k dec_input_modalities to enc_input_modalities.
-            # The resulting shapes for each tensor should be [1, N_prev + k].
-            enc_input_tokens = torch.cat([enc_input_tokens, samples], dim=1)
-            enc_input_positions = torch.cat([enc_input_positions, dec_input_positions.unsqueeze(0)], dim=1)
-            enc_input_modalities = torch.cat([enc_input_modalities, dec_input_modalities], dim=1)
-                   
-        # Select the predicted tokens for the target modality and unshuffle them
-        pred_tokens = enc_input_tokens[enc_input_modalities == target_mod_index]
-        indices = enc_input_positions[enc_input_modalities == target_mod_index]
-        pred_tokens = pred_tokens[indices.argsort()].unsqueeze(0)
+            samples = samples.squeeze(0)
+            
+            # Store the generated tokens
+            all_generated_tokens[positions_to_predict] = samples
+            
+            # Add the predicted tokens to the encoder inputs for the next step
+            new_tokens = samples
+            new_positions = positions_to_predict
+            new_modalities = dec_input_modalities
+            
+            enc_input_tokens = torch.cat([enc_input_tokens, new_tokens.unsqueeze(0)], dim=1)
+            enc_input_positions = torch.cat([enc_input_positions, new_positions.unsqueeze(0)], dim=1)
+            enc_input_modalities = torch.cat([enc_input_modalities, new_modalities.unsqueeze(0)], dim=1)
+        
+        # Create the final predicted tokens tensor
+        pred_tokens = all_generated_tokens.unsqueeze(0)
         
         return pred_tokens, enc_input_tokens, enc_input_positions, enc_input_modalities

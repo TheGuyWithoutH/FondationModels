@@ -58,7 +58,11 @@ class GPT(nn.Module):
         self.max_seq_len = max_seq_len
         self.init_std = init_std
 
-        self.input_embedding = nn.Embedding(vocab_size, dim, padding_idx=padding_idx) # Input embedding layer
+        if padding_idx != -100:
+            self.input_embedding = nn.Embedding(vocab_size, dim, padding_idx=padding_idx) # Input embedding layer
+        else:
+            self.input_embedding = nn.Embedding(vocab_size, dim)
+            
         self.positional_embedding = nn.Parameter(torch.randn(max_seq_len, dim))
         
         self.trunk = TransformerTrunk(dim, depth, head_dim, mlp_ratio, use_bias)
@@ -213,13 +217,14 @@ class GPT(nn.Module):
             # Keep only the last token's logits and sample the next token
             # Hint: Use the sample_tokens function from utils/sampling.py
             # Make sure to pass the temperature, top_k and top_p arguments
-            new_token = sample_tokens(logits=logits[:, -1, :], temperature=temp, top_k=top_k, top_p=top_p)
+            new_token, _ = sample_tokens(logits=logits[:, -1, :], temperature=temp, top_k=top_k, top_p=top_p)
 
-            # Concatenate the new token to the current_tokens sequence
-            current_tokens = torch.cat([current_tokens, [[new_token]]], dim=1)
+            # Add new token to context
+            new_token_tensor = new_token.view(1, 1)
+            current_tokens = torch.cat([current_tokens, new_token_tensor], dim=1)
 
             # Break if the end-of-sequence token is generated
-            if new_token == eos_idx:
+            if new_token.item() == eos_idx:
                 break
 
         if was_training:
