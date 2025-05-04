@@ -5,3 +5,8 @@
 .DS_Store
 __pycache__
 .ipynb_checkpoints
+
+
+clevr_com_304
+outputs
+wandb
